@@ -17,7 +17,7 @@ function renderBanner(query) {
   //
   //   Hint: assign the value with `textContent` instead of `innerHTML`, e.g.
   //   resultsEl.textContent = "Results for: " + query;
-  resultsEl.innerHTML = "Results for: " + query;
+  resultsEl.textContent = "Results for: " + query;
 }
 
 // Wire up the real feature on page load, using the live URL as the source.
@@ -31,3 +31,5 @@ initFromUrl();
 
 // Expose the render entry point so the attack harness can drive it directly.
 window.renderBanner = renderBanner;
+
+
