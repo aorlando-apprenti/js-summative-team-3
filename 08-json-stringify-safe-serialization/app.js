@@ -26,7 +26,7 @@ export const sessionState = {
 // Naive serialize: hands the WHOLE object to JSON.stringify. Every own enumerable
 // property is emitted — including sessionToken and internalFlags.
 export function serializeSession(session) {
-  // TODO: This is the defense point. The line below stringifies the entire
+  // COMPLETE: This is the defense point. The line below stringifies the entire
   // object, so the sessionToken and internalFlags leak into the stored string.
   // Replace it so that ONLY an explicit allow-list of fields is emitted —
   // userId, displayName, theme, and lastSeen — and nothing else.
@@ -35,7 +35,12 @@ export function serializeSession(session) {
   //   e.g. JSON.stringify(session, ["userId", "displayName", "theme", "lastSeen"]).
   //   (You could also use a replacer function or a toJSON method on a session
   //   model — any of the three enforces the allow-list.)
-  return JSON.stringify(session);
+  return JSON.stringify(session, [
+    "userId",
+    "displayName",
+    "theme",
+    "lastSeen"
+  ]);
 }
 
 // The persistence layer that actually uses the serializer.
