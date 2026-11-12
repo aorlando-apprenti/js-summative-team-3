@@ -31,7 +31,11 @@ function init() {
   renderMembers(MEMBER_LIST, document.getElementById("members"));
 
   // The settings blob -> the merge.
-  applySettings(SETTINGS_TEXT);
+  const settings = applySettings(SETTINGS_TEXT);
+
+  if (settings === null) {
+    console.warn("The settings update was rejected.");
+  }
 }
 
 if (document.readyState === "loading") {

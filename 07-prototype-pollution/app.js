@@ -29,15 +29,41 @@ export function parseSettings(rawText) {
 // The naive recursive merge. There is NO key guard, so "__proto__",
 // "constructor", and "prototype" are treated like any other field — including
 // inside the recursion, which is how a nested payload reaches the prototype too.
-function deepMerge(target, source) {
-  for (const key in source) {
-    if (isObject(target[key]) && isObject(source[key])) {
-      deepMerge(target[key], source[key]); // recurse with no guard
-    } else {
-      target[key] = source[key]; // __proto__ / constructor write through here
+// Fixed below: every recursive call applies the same protections.
+function safeDeepMerge(target, source) {
+  const result = Object.create(null);
+
+  for (const object of [target, source]) {
+    if (!isObject(object)) continue;
+
+    for (const key in object) {
+      // Read only this object's own properties.
+      if (!Object.hasOwn(object, key)) continue;
+
+      // Block dangerous keys before reading their values.
+      if (
+        key === "__proto__" ||
+        key === "constructor" ||
+        key === "prototype"
+      ) {
+        continue;
+      }
+
+      const value = object[key];
+
+      if (isObject(value)) {
+        const existing = Object.hasOwn(result, key)
+          ? result[key]
+          : Object.create(null);
+
+        result[key] = safeDeepMerge(existing, value);
+      } else {
+        result[key] = value;
+      }
     }
   }
-  return target;
+
+  return result;
 }
 
 // Apply a parsed settings source over a fresh copy of the defaults.
@@ -50,10 +76,51 @@ export function applySettings(parsedSource) {
   // "__proto__", "constructor", or "prototype" at EVERY recursion level; copy
   // only own keys with Object.hasOwn; and (optionally) strip dangerous keys at
   // parse time with a JSON.parse reviver in parseSettings above.
-  const target = {}; // plain object — prototype is Object.prototype
-  // Seed with a shallow copy of the defaults so a real update merges over them.
-  for (const key in DEFAULT_SETTINGS) {
-    target[key] = DEFAULT_SETTINGS[key];
-  }
-  return deepMerge(target, parsedSource);
+  return safeDeepMerge(DEFAULT_SETTINGS, parsedSource);
 }
+
+const attackTests = [
+  {
+    name: "flat attack",
+    json: '{"__proto__": {"isAdmin": true}}'
+  },
+  {
+    name: "nested attack",
+    json: '{"profile": {"__proto__": {"isAdmin": true}}}'
+  }
+];
+
+for (const test of attackTests) {
+  applySettings(parseSettings(test.json));
+
+  const currentUser = {};
+  const prototypeOwnsIsAdmin =
+    Object.hasOwn(Object.prototype, "isAdmin");
+
+  console.assert(
+    prototypeOwnsIsAdmin === false,
+    `${test.name}: Object.prototype must stay clean`
+  );
+
+  console.assert(
+    ({}).isAdmin === undefined,
+    `${test.name}: empty objects must not inherit isAdmin`
+  );
+
+  console.assert(
+    !currentUser.isAdmin,
+    `${test.name}: the admin branch must not be entered`
+  );
+
+  console.log(`[regression] ${test.name}`, {
+    prototypeOwnsIsAdmin,
+    emptyObjectIsAdmin: ({}).isAdmin,
+    userOwnsIsAdmin: Object.hasOwn(currentUser, "isAdmin"),
+    adminBranchTaken: Boolean(currentUser.isAdmin)
+  });
+}
+
+
+
+
+

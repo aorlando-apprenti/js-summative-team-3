@@ -1,0 +1,1 @@
+The nested attack defeats a top-level-only guard because its `__proto__` key is inside `profile`. The hardened merge checks dangerous keys at every recursion level. Both attack regression tests passed, and the valid settings update still worked.

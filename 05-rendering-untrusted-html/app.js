@@ -22,6 +22,67 @@
 //     tree, drop any tag not on a small allow-list, strip any attribute not
 //     permitted, re-validate href schemes, then serialize and assign that string.
 
+function sanitizeManually(html) {
+  const parsed = new DOMParser().parseFromString(
+    String(html ?? ""),
+    "text/html"
+  );
+
+  const allowed = {
+    b: [],
+    strong: [],
+    i: [],
+    em: [],
+    a: ["href", "title"],
+    ul: [],
+    ol: [],
+    li: [],
+    p: [],
+    br: []
+  };
+
+  for (const element of parsed.body.querySelectorAll("*")) {
+    const tag = element.localName;
+
+    if (
+      element.namespaceURI !== "http://www.w3.org/1999/xhtml" ||
+      !Object.hasOwn(allowed, tag)
+    ) {
+      element.remove();
+      continue;
+    }
+
+    for (const attribute of Array.from(element.attributes)) {
+      if (!allowed[tag].includes(attribute.name)) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+
+    if (element.hasAttribute("href")) {
+      try {
+        const url = new URL(
+          element.getAttribute("href"),
+          document.baseURI
+        );
+
+        if (
+          url.protocol === "http:" ||
+          url.protocol === "https:"
+        ) {
+          element.setAttribute("href", url.href);
+        } else {
+          element.removeAttribute("href");
+        }
+      } catch {
+        element.removeAttribute("href");
+      }
+    }
+  }
+
+  return parsed.body.innerHTML;
+}
+
+
 function renderComment(comment, host) {
   const el = document.createElement("div");
   el.className = "comment";
@@ -29,9 +90,24 @@ function renderComment(comment, host) {
   // TODO: Sanitize comment.html (DOMPurify with a strict config, or a manual
   //       allow-list sanitizer) and assign the cleaned string here — with no
   //       concatenation after the sanitizer runs.
-  el.innerHTML = comment.html; // VULNERABLE: untrusted HTML straight to the sink
+  const useManual = true;
 
+  const cleaned = useManual
+    ? sanitizeManually(comment.html)
+    : DOMPurify.sanitize(comment.html, {
+      ALLOWED_TAGS: [
+        "b", "strong",
+        "i", "em",
+        "a",
+        "ul", "ol", "li",
+        "p", "br"
+      ],
+      ALLOWED_ATTR: ["href", "title"]
+    });
+
+  el.innerHTML = cleaned;
   host.appendChild(el);
 }
 
 window.renderComment = renderComment;
+

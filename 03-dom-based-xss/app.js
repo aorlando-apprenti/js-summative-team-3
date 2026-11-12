@@ -35,8 +35,9 @@ function render() {
   //   const detail = document.createElement("small");
   //   detail.textContent = "tab id: " + tabName;
   //   panel.append(detail);
-  const detailString = "<small>tab id: " + tabName + "</small>";
-  panel.insertAdjacentHTML("beforeend", detailString);     // sink 2
+  const detail = document.createElement("small");
+  detail.textContent = "tab id: " + tabName;
+  panel.append(detail); // sink 2
 }
 
 window.addEventListener("hashchange", render);

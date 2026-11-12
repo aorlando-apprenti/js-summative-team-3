@@ -18,11 +18,43 @@
 function renderSearch(term, el) {
   // SOURCE: location.search ?q=  (see app.js).  SINK: innerHTML.
   // The untrusted term is concatenated into markup and parsed as HTML.
-  el.innerHTML = "Showing results for: <strong>" + term + "</strong>";
+  el.textContent = "Showing results for: ";
+
+  const strong = document.createElement("strong");
+  strong.textContent = typeof term === "string" ? term : "";
+
+  el.appendChild(strong);
+}
+
+function safeWebsite(raw) {
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return null;
+  }
+
+  try {
+    const url = new URL(raw, document.baseURI);
+
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function isValidMember(member) {
+  return member !== null &&
+    typeof member === "object" &&
+    !Array.isArray(member) &&
+    ["name", "bio", "website"].every((key) =>
+      Object.hasOwn(member, key) && typeof member[key] === "string"
+    );
 }
 
 // Render one member card and append it to the list container.
 function renderMember(member, listEl) {
+  if (!isValidMember(member)) return;
+
   const card = document.createElement("div");
   card.className = "member";
 
@@ -34,19 +66,50 @@ function renderMember(member, listEl) {
   // Bio: rendered as HTML so light formatting shows. SINK: insertAdjacentHTML.
   // The stored bio is attacker-controllable (a saved profile field), so this is
   // a markup sink fed by persisted untrusted data.
-  card.insertAdjacentHTML("beforeend", "<p>" + member.bio + "</p>");
+  const bio = document.createElement("div");
+
+  if (
+    window.DOMPurify &&
+    typeof window.DOMPurify.sanitize === "function"
+  ) {
+    const cleaned = window.DOMPurify.sanitize(member.bio, {
+      ALLOWED_TAGS: [
+        "b", "strong", "i", "em",
+        "p", "br", "ul", "ol", "li"
+      ],
+      ALLOWED_ATTR: [],
+      RETURN_DOM_FRAGMENT: true
+    });
+
+    bio.appendChild(cleaned);
+  } else {
+    // If the library is unavailable, display plain text safely.
+    bio.textContent = member.bio;
+  }
+
+  card.appendChild(bio);
 
   // Profile link. SINK: href set from untrusted data with no scheme check, so a
   // "javascript:" value becomes executable when clicked.
   const link = document.createElement("a");
-  link.href = member.website;
+  const href = safeWebsite(member.website);
+
+  if (href !== null) {
+    link.href = href;
+  }
+
   link.textContent = "Profile";
   card.appendChild(link);
 
   // "Say hi" button. SINK: an inline onclick string built from the member name,
   // so a name containing a quote-and-paren breakout injects code.
   const btn = document.createElement("button");
-  btn.setAttribute("onclick", "alert('hi ' + '" + member.name + "')");
+  btn.type = "button";
+
+  btn.addEventListener("click", () => {
+    alert("hi " + member.name);
+  });
+
   btn.textContent = "Say hi";
   card.appendChild(btn);
 
@@ -56,6 +119,15 @@ function renderMember(member, listEl) {
 // Render the whole member list.
 function renderMembers(members, el) {
   el.replaceChildren();
+
+  if (
+    !Array.isArray(members) ||
+    !members.every(isValidMember)
+  ) {
+    el.textContent = "Unable to load the member list.";
+    return;
+  }
+
   for (const m of members) renderMember(m, el);
 }
 

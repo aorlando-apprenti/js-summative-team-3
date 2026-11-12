@@ -41,9 +41,36 @@ export function applyProfile(user, parsed) {
   //
   //   3. `parsed.tier == 1` is loose equality. Use a type check plus strict
   //      equality: typeof parsed.tier === "number" && parsed.tier === 1.
-  Object.assign(user, parsed);                   // (a) mass assignment
-  const chosen = settings[parsed.preferredKey];  // (b) unsafe dynamic read
-  const isTierOne = parsed.tier == 1;            // (c) loose-equality gate
+
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed)
+  ) {
+    return { user, chosen: undefined, isTierOne: false };
+  }
+
+  for (const key of ["displayName", "theme", "tier"]) {
+    if (Object.hasOwn(parsed, key)) {
+      user[key] = parsed[key];
+    }
+  }
+
+  const preferredKey = Object.hasOwn(parsed, "preferredKey")
+    ? parsed.preferredKey
+    : undefined;
+
+  const chosen =
+    typeof preferredKey === "string" &&
+      Object.hasOwn(settings, preferredKey)
+      ? settings[preferredKey]
+      : undefined;
+
+  const tier = Object.hasOwn(parsed, "tier")
+    ? parsed.tier
+    : undefined;
+
+  const isTierOne = typeof tier === "number" && tier === 1;
 
   return { user, chosen, isTierOne };
 }
